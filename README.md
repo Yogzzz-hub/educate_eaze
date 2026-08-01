@@ -41,3 +41,7 @@ This seeds one university and 30 demo colleges.
 ## Notes
 - Database migrations are wired through Alembic.
 - Nginx routes API requests to the backend and frontend traffic to the React app.
+- The backend exposes Swagger UI at /docs and OpenAPI at /openapi.json.
+- Demo login credentials:
+  - Super Admin: super.admin@northbridge.edu / Admin@123
+  - University Admin: university.admin@northbridge.edu / Admin@123
