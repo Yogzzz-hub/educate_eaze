@@ -5,11 +5,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: academic-frontend
+    container_name: eduease-frontend
     ports:
       - "3000:3000"
     environment:
-      VITE_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-eduease}
     depends_on:
       - backend
 
@@ -17,15 +19,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: academic-backend
+    container_name: eduease-backend
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/academic_platform
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/academic_platform}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-jwt}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FILE_STORAGE_PATH: /app/storage
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-eduease}
     depends_on:
       db:
         condition: service_healthy
@@ -34,11 +39,11 @@ services:
     volumes:
       - ./backend:/app
       - backend-storage:/app/storage
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   db:
     image: postgres:16-alpine
-    container_name: academic-db
+    container_name: eduease-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-academic_platform}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -56,7 +61,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: academic-redis
+    container_name: eduease-redis
     ports:
       - "6379:6379"
     volumes:
@@ -64,7 +69,7 @@ services:
 
   n8n:
     image: n8nio/n8n:latest
-    container_name: academic-n8n
+    container_name: eduease-n8n
     ports:
       - "5678:5678"
     environment:
@@ -78,7 +83,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: academic-nginx
+    container_name: eduease-nginx
     ports:
       - "80:80"
     volumes:

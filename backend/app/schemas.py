@@ -1,28 +1,77 @@
+from __future__ import annotations
+
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+)
 
 
-class Token(BaseModel):
+class SchemaModel(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
+
+
+# =========================================================
+# Authentication and users
+# =========================================================
+
+
+class AuthRequest(SchemaModel):
+    email: EmailStr
+    password: str
+
+
+class LoginRequest(AuthRequest):
+    """Compatibility schema for routes using LoginRequest."""
+
+    pass
+
+
+class Token(SchemaModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
 
-class TokenPayload(BaseModel):
+class TokenPayload(SchemaModel):
     sub: str
     role: str
     token_type: str
 
 
-class LoginRequest(BaseModel):
+class AuthResponse(SchemaModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    user_id: int
+
+
+class UserCreate(SchemaModel):
     email: EmailStr
-    password: str
+    password: str = Field(exclude=True)
+    full_name: str
+    role: str
+    college_id: Optional[int] = None
+
+    # Retained for compatibility with newer APIs.
+    department_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+    )
+    programme_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+    )
 
 
-class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class UserOut(SchemaModel):
     id: int
     email: str
     full_name: str
@@ -30,7 +79,12 @@ class UserOut(BaseModel):
     college_id: Optional[int] = None
 
 
-class UniversityBase(BaseModel):
+# =========================================================
+# University and college
+# =========================================================
+
+
+class UniversityBase(SchemaModel):
     name: str
     address: Optional[str] = None
 
@@ -40,15 +94,25 @@ class UniversityCreate(UniversityBase):
 
 
 class UniversityOut(UniversityBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class CollegeBase(BaseModel):
+class CollegeBase(SchemaModel):
     name: str
-    address: Optional[str] = None
-    university_id: int
+    address: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "address",
+            "location",
+        ),
+    )
+    university_id: Optional[int] = None
+
+    @property
+    def location(self) -> Optional[str]:
+        """Compatibility property for APIs using location."""
+
+        return self.address
 
 
 class CollegeCreate(CollegeBase):
@@ -56,12 +120,15 @@ class CollegeCreate(CollegeBase):
 
 
 class CollegeOut(CollegeBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class DepartmentBase(BaseModel):
+# =========================================================
+# Departments, programmes and subjects
+# =========================================================
+
+
+class DepartmentBase(SchemaModel):
     name: str
     college_id: int
 
@@ -71,27 +138,38 @@ class DepartmentCreate(DepartmentBase):
 
 
 class DepartmentOut(DepartmentBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class ProgrammeBase(BaseModel):
+class ProgrammeBase(SchemaModel):
     name: str
     department_id: int
 
 
 class ProgrammeCreate(ProgrammeBase):
-    pass
+    # Some newer APIs send college_id as additional context.
+    # It is excluded from direct ORM model dumps.
+    college_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+    )
 
 
 class ProgrammeOut(ProgrammeBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class StudentBase(BaseModel):
+class SubjectCreate(SchemaModel):
+    name: str
+    programme_id: int
+
+
+# =========================================================
+# Students
+# =========================================================
+
+
+class StudentBase(SchemaModel):
     full_name: str
     email: EmailStr
     registration_number: str
@@ -101,34 +179,52 @@ class StudentBase(BaseModel):
 
 
 class StudentCreate(StudentBase):
-    pass
+    # Required only by APIs that also create a student login.
+    # Excluded when converting the schema into Student ORM data.
+    password: Optional[str] = Field(
+        default=None,
+        exclude=True,
+    )
 
 
 class StudentOut(StudentBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class FacultyBase(BaseModel):
+# =========================================================
+# Faculty
+# =========================================================
+
+
+class FacultyBase(SchemaModel):
     full_name: str
     email: EmailStr
-    employee_id: str
+    employee_id: Optional[str] = None
     college_id: int
     department_id: Optional[int] = None
 
 
 class FacultyCreate(FacultyBase):
-    pass
+    password: Optional[str] = Field(
+        default=None,
+        exclude=True,
+    )
+    designation: Optional[str] = Field(
+        default=None,
+        exclude=True,
+    )
 
 
 class FacultyOut(FacultyBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class AttendanceRecordBase(BaseModel):
+# =========================================================
+# Attendance and marks
+# =========================================================
+
+
+class AttendanceRecordBase(SchemaModel):
     student_id: int
     date: str
     status: str
@@ -139,12 +235,10 @@ class AttendanceRecordCreate(AttendanceRecordBase):
 
 
 class AttendanceRecordOut(AttendanceRecordBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class MarkBase(BaseModel):
+class MarkBase(SchemaModel):
     student_id: int
     subject: str
     score: float
@@ -155,8 +249,6 @@ class InternalMarkCreate(MarkBase):
 
 
 class InternalMarkOut(MarkBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
@@ -165,12 +257,37 @@ class PracticalMarkCreate(MarkBase):
 
 
 class PracticalMarkOut(MarkBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class SubmissionBase(BaseModel):
+class ExaminationCreate(SchemaModel):
+    title: str
+    subject_id: int
+    programme_id: int
+    college_id: int
+    department_id: int
+    max_marks: int = Field(
+        default=100,
+        ge=1,
+    )
+    exam_type: str = "MIDTERM"
+
+
+class MarkCreate(SchemaModel):
+    examination_id: int
+    student_id: int
+    obtained_marks: int = Field(ge=0)
+    max_marks: int = Field(ge=1)
+    is_present: bool = True
+    remarks: Optional[str] = None
+
+
+# =========================================================
+# Submissions
+# =========================================================
+
+
+class SubmissionBase(SchemaModel):
     student_id: int
     title: str
     status: str = "submitted"
@@ -181,12 +298,15 @@ class SubmissionCreate(SubmissionBase):
 
 
 class SubmissionOut(SubmissionBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class WorkflowBase(BaseModel):
+# =========================================================
+# Workflows and approvals
+# =========================================================
+
+
+class WorkflowBase(SchemaModel):
     title: str
     current_stage: str = "review"
     assigned_to: Optional[str] = None
@@ -197,12 +317,10 @@ class WorkflowCreate(WorkflowBase):
 
 
 class WorkflowOut(WorkflowBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class WorkflowHistoryBase(BaseModel):
+class WorkflowHistoryBase(SchemaModel):
     workflow_id: int
     stage: str
     note: Optional[str] = None
@@ -213,13 +331,24 @@ class WorkflowHistoryCreate(WorkflowHistoryBase):
 
 
 class WorkflowHistoryOut(WorkflowHistoryBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class GrievanceBase(BaseModel):
-    student_id: int
+class ApprovalCreate(SchemaModel):
+    entity_type: str
+    entity_id: int
+    role: str
+    status: str = "PENDING"
+    comment: Optional[str] = None
+
+
+# =========================================================
+# Grievances
+# =========================================================
+
+
+class GrievanceBase(SchemaModel):
+    student_id: Optional[int] = None
     title: str
     description: str
     status: str = "open"
@@ -230,12 +359,15 @@ class GrievanceCreate(GrievanceBase):
 
 
 class GrievanceOut(GrievanceBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class NotificationBase(BaseModel):
+# =========================================================
+# Notifications and AI alerts
+# =========================================================
+
+
+class NotificationBase(SchemaModel):
     recipient: str
     message: str
     is_read: bool = False
@@ -246,12 +378,10 @@ class NotificationCreate(NotificationBase):
 
 
 class NotificationOut(NotificationBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class AiAlertBase(BaseModel):
+class AiAlertBase(SchemaModel):
     title: str
     message: str
     severity: str = "info"
@@ -262,21 +392,22 @@ class AiAlertCreate(AiAlertBase):
 
 
 class AiAlertOut(AiAlertBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
 
 
-class AuditLogOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+# =========================================================
+# Audit, analytics and reports
+# =========================================================
 
+
+class AuditLogOut(SchemaModel):
     id: int
     entity: str
     action: str
     actor: Optional[str] = None
 
 
-class AnalyticsSummary(BaseModel):
+class AnalyticsSummary(SchemaModel):
     total_universities: int
     total_colleges: int
     total_students: int
@@ -284,7 +415,7 @@ class AnalyticsSummary(BaseModel):
     pending_grievances: int
 
 
-class ReportSummary(BaseModel):
+class ReportSummary(SchemaModel):
     attendance_rate: float
     average_internal_mark: float
     average_practical_mark: float
