@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: eduease-frontend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:-}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile
     container_name: eduease-backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/academic_platform}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-jwt}
@@ -63,7 +63,7 @@ services:
     image: redis:7-alpine
     container_name: eduease-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis-data:/data
 
