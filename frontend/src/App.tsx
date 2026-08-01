@@ -1,29 +1,79 @@
-const colleges = [
-  'Demo College A',
-  'Demo College B',
-  'Demo College C',
-];
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { LoginPage } from './pages/LoginPage';
+import { Layout } from './components/Layout';
+import { DashboardPage } from './pages/DashboardPage';
+import { CollegesPage } from './pages/CollegesPage';
+import { StudentsPage } from './pages/StudentsPage';
+import { SubmissionsPage } from './pages/SubmissionsPage';
+import { WorkflowPage } from './pages/WorkflowPage';
+import { IntelligencePage } from './pages/IntelligencePage';
+import { InsightsPage } from './pages/InsightsPage';
+import { GrievancesPage } from './pages/GrievancesPage';
+import { CertificatesPage } from './pages/CertificatesPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import type { AuthUser, Role } from './types';
+
+const queryClient = new QueryClient();
+
+const roleLabels: Record<Role, string> = {
+  super_admin: 'Super Admin',
+  university_admin: 'University Admin',
+  college_staff: 'College Staff',
+  student: 'Student',
+};
 
 function App() {
-  return (
-    <div className="min-h-screen bg-slate-950 p-8 text-slate-100">
-      <div className="mx-auto max-w-5xl rounded-2xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl">
-        <p className="mb-3 text-sm uppercase tracking-[0.35em] text-cyan-400">University Academic Platform</p>
-        <h1 className="text-4xl font-semibold">Workflow & Process Intelligence</h1>
-        <p className="mt-4 max-w-2xl text-lg text-slate-300">
-          Coordinate academic operations, automate approvals, and surface institutional insights across a network of colleges.
-        </p>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {colleges.map((college) => (
-            <div key={college} className="rounded-xl border border-slate-800 bg-slate-800/70 p-4">
-              <h2 className="font-medium">{college}</h2>
-              <p className="mt-2 text-sm text-slate-400">Ready for workflow onboarding</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const stored = localStorage.getItem('academic-user');
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('academic-user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('academic-user');
+    }
+  }, [user]);
+
+  const role = user?.role as Role | undefined;
+  const roleTitle = role ? roleLabels[role] : 'Guest';
+
+  const routes = useMemo(() => {
+    if (!user) {
+      return (
+        <Routes>
+          <Route path="/login" element={<LoginPage onLogin={setUser} />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      );
+    }
+
+    return (
+      <Layout user={user} roleTitle={roleTitle} onLogout={() => setUser(null)}>
+        <Routes>
+          <Route path="/" element={<DashboardPage role={role!} />} />
+          <Route path="/dashboard" element={<DashboardPage role={role!} />} />
+          <Route path="/colleges" element={<CollegesPage />} />
+          <Route path="/students" element={<StudentsPage />} />
+          <Route path="/submissions" element={<SubmissionsPage />} />
+          <Route path="/workflow" element={<WorkflowPage />} />
+          <Route path="/intelligence" element={<IntelligencePage />} />
+          <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/grievances" element={<GrievancesPage />} />
+          <Route path="/certificates" element={<CertificatesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Layout>
+    );
+  }, [role, roleTitle, user]);
+
+  return <QueryClientProvider client={queryClient}>{<BrowserRouter>{routes}</BrowserRouter>}</QueryClientProvider>;
 }
 
 export default App;
